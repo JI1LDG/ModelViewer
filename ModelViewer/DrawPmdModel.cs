@@ -34,13 +34,14 @@ namespace ModelViewer {
 
 		private void DrawTriangle() {
 			effect.GetTechniqueByIndex(0).GetPassByIndex(0).Apply(device.ImmediateContext);
-			device.ImmediateContext.Draw(pmdLoader.Vertex.Length, 0);
+			device.ImmediateContext.Draw(pmdLoader.Index.Length * 3, 0);
 		}
 
 		protected override void LoadContent() {
 			InitializeEffect();
 			InitializeVertexLayout();
 			InitializeVertexBuffer();
+			InitializeRasterizerState();
 		}
 
 		private void InitializeEffect() {
@@ -62,7 +63,7 @@ namespace ModelViewer {
 
 		private void InitializeVertexBuffer() {
 			using(var vertexStream = new DataStream(
-				pmdLoader.Vertex.Select(x => x.Position).ToArray(), true, true)) {
+				pmdLoader.Index.SelectMany(x => x.Indicies).Select(x => pmdLoader.Vertex[x].Position).ToArray(), true, true)) {
 				vertexBuffer = new Dx11.Buffer(device, vertexStream,
 					new Dx11.BufferDescription() {
 						SizeInBytes = (int)vertexStream.Length, BindFlags = Dx11.BindFlags.VertexBuffer
@@ -71,7 +72,16 @@ namespace ModelViewer {
 			}
 		}
 
+		private void InitializeRasterizerState() {
+			device.ImmediateContext.Rasterizer.State = Dx11.RasterizerState.FromDescription(device,
+				new Dx11.RasterizerStateDescription() {
+					CullMode = Dx11.CullMode.Back, FillMode = Dx11.FillMode.Solid,
+				}
+			);
+		}
+
 		protected override void UnloadContent() {
+			device.ImmediateContext.Rasterizer.State.Dispose();
 			effect.Dispose();
 			vertexLayout.Dispose();
 			vertexBuffer.Dispose();

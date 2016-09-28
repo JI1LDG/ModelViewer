@@ -27,7 +27,7 @@ namespace ModelViewer {
 
 		private void DrawTriangle() {
 			effect.GetTechniqueByIndex(0).GetPassByIndex(0).Apply(device.ImmediateContext);
-			device.ImmediateContext.Draw(6, 0);
+			device.ImmediateContext.Draw(3, 0);
 		}
 
 		protected override void LoadContent() {
