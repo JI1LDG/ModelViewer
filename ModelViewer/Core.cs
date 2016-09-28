@@ -49,7 +49,6 @@ namespace ModelViewer {
 		private void InitializeRenderTarget() {
 			using(var backBuffer = Dx11.Resource.FromSwapChain<Dx11.Texture2D>(swapChain, 0)) {
 				renderTarget = new Dx11.RenderTargetView(device, backBuffer);
-				//ここ忘れてた
 				device.ImmediateContext.OutputMerger.SetTargets(renderTarget);
 			}
 		}

@@ -1,13 +1,20 @@
-﻿using SlimDX;
+﻿using MmdFileLoader.Pmd;
+using SlimDX;
 using SlimDX.D3DCompiler;
+using System.Linq;
 using Dx11 = SlimDX.Direct3D11;
 using Dxgi = SlimDX.DXGI;
 
 namespace ModelViewer {
-	class Triangle : Core {
+	class DrawPmdModel : Core {
 		Dx11.Effect effect;
 		Dx11.InputLayout vertexLayout;
 		Dx11.Buffer vertexBuffer;
+		PmdLoader pmdLoader;
+
+		public DrawPmdModel(string Path) {
+			pmdLoader = new PmdLoader(Path);
+		}
 
 		protected override void Draw() {
 			device.ImmediateContext.ClearRenderTargetView(renderTarget, new Color4(1, 0, 0, 1));
@@ -27,7 +34,7 @@ namespace ModelViewer {
 
 		private void DrawTriangle() {
 			effect.GetTechniqueByIndex(0).GetPassByIndex(0).Apply(device.ImmediateContext);
-			device.ImmediateContext.Draw(6, 0);
+			device.ImmediateContext.Draw(pmdLoader.Vertex.Length, 0);
 		}
 
 		protected override void LoadContent() {
@@ -55,9 +62,7 @@ namespace ModelViewer {
 
 		private void InitializeVertexBuffer() {
 			using(var vertexStream = new DataStream(
-				new[] {
-					new Vector3(0, 0.5f, 0), new Vector3(0.5f, 0, 0), new Vector3(-0.5f, 0, 0),
-				}, true, true)) {
+				pmdLoader.Vertex.Select(x => x.Position).ToArray(), true, true)) {
 				vertexBuffer = new Dx11.Buffer(device, vertexStream,
 					new Dx11.BufferDescription() {
 						SizeInBytes = (int)vertexStream.Length, BindFlags = Dx11.BindFlags.VertexBuffer

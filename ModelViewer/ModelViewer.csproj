@@ -34,6 +34,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="MmdFileLoader">
+      <HintPath>..\..\MmdFileLoader\MmdFileLoader\bin\Release\MmdFileLoader.dll</HintPath>
+    </Reference>
     <Reference Include="SlimDX, Version=4.0.13.43, Culture=neutral, PublicKeyToken=b1b0c32fd1ffe4f9, processorArchitecture=x86">
       <HintPath>..\packages\SlimDX.4.0.13.44\lib\NET40\SlimDX.dll</HintPath>
       <Private>True</Private>
@@ -52,6 +55,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Core.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DrawPmdModel.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Program.cs" />
