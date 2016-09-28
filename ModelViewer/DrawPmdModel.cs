@@ -75,7 +75,7 @@ namespace ModelViewer {
 		private void InitializeRasterizerState() {
 			device.ImmediateContext.Rasterizer.State = Dx11.RasterizerState.FromDescription(device,
 				new Dx11.RasterizerStateDescription() {
-					CullMode = Dx11.CullMode.Back, FillMode = Dx11.FillMode.Solid,
+					CullMode = Dx11.CullMode.None, FillMode = Dx11.FillMode.Solid,
 				}
 			);
 		}
