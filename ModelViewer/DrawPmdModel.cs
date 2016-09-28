@@ -1,6 +1,7 @@
 ﻿using MmdFileLoader.Pmd;
 using SlimDX;
 using SlimDX.D3DCompiler;
+using System;
 using System.Linq;
 using Dx11 = SlimDX.Direct3D11;
 using Dxgi = SlimDX.DXGI;
@@ -11,18 +12,39 @@ namespace ModelViewer {
 		Dx11.InputLayout vertexLayout;
 		Dx11.Buffer vertexBuffer;
 		PmdLoader pmdLoader;
+		int flameCount;
 
 		public DrawPmdModel(string Path) {
 			pmdLoader = new PmdLoader(Path);
+			flameCount = 0;
 		}
 
 		protected override void Draw() {
 			device.ImmediateContext.ClearRenderTargetView(renderTarget, new Color4(1, 0, 0, 1));
 
+			UpdateCamera();
 			InitializeInputAsselbler();
 			DrawTriangle();
 
 			swapChain.Present(0, Dxgi.PresentFlags.None);
+
+			flameCount++;
+		}
+
+		private void UpdateCamera() {
+			var world = Matrix.RotationY((flameCount / 20 % 360) * (float)Math.PI / 180);
+
+			var view = Matrix.LookAtRH(
+				new Vector3(0, 10, -10), new Vector3(0, 10, 0), new Vector3(0, 1, 0)
+			);
+
+			var projection = Matrix.PerspectiveFovRH(
+				(float)Math.PI / 2, ClientSize.Width / ClientSize.Height, 0.1f, 1000
+			);
+
+			effect.GetVariableByName("World").AsMatrix().SetMatrix(world);
+			effect.GetVariableByName("View").AsMatrix().SetMatrix(view);
+			effect.GetVariableByName("Projection").AsMatrix().SetMatrix(projection);
 		}
 
 		private void InitializeInputAsselbler() {
