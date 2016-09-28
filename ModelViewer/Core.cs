@@ -6,9 +6,12 @@ using Dxgi = SlimDX.DXGI;
 
 namespace ModelViewer {
 	class Core : Form {
-		private Dx11.Device device;
-		private Dxgi.SwapChain swapChain;
-		private Dx11.RenderTargetView renderTarget;
+		protected Dx11.Device device;
+		protected Dxgi.SwapChain swapChain;
+		protected Dx11.RenderTargetView renderTarget;
+
+		protected virtual void LoadContent() { }
+		protected virtual void UnloadContent() { }
 
 		public void Run() {
 			InitializeDevice();
@@ -39,15 +42,26 @@ namespace ModelViewer {
 			);
 
 			InitializeRenderTarget();
+			InitializeViewport();
+			LoadContent();
 		}
 
 		private void InitializeRenderTarget() {
 			using(var backBuffer = Dx11.Resource.FromSwapChain<Dx11.Texture2D>(swapChain, 0)) {
 				renderTarget = new Dx11.RenderTargetView(device, backBuffer);
+				//ここ忘れてた
+				device.ImmediateContext.OutputMerger.SetTargets(renderTarget);
 			}
 		}
 
+		private void InitializeViewport() {
+			device.ImmediateContext.Rasterizer.SetViewports(
+				new Dx11.Viewport() { Width = ClientSize.Width, Height = ClientSize.Height }
+			);
+		}
+
 		private void DisposeDevice() {
+			UnloadContent();
 			renderTarget.Dispose();
 			device.Dispose();
 			swapChain.Dispose();

@@ -4,7 +4,7 @@ using System.Windows.Forms;
 namespace ModelViewer {
 	static class Program {
 		static void Main() {
-			using(var core = new Core()) {
+			using(Core core = new Triangle()) {
 				core.Run();
 			}
 		}
