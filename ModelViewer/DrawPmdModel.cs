@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dx11 = SlimDX.Direct3D11;
 using Dxgi = SlimDX.DXGI;
+using Rwin = SlimDX.RawInput;
 
 namespace ModelViewer {
 	class DrawPmdModel : Core {
@@ -17,11 +18,15 @@ namespace ModelViewer {
 		PmdLoader pmdLoader;
 		int flameCount;
 		string parentDir;
+		bool isMiddleMoving;
+		bool isRightMoving;
+		MovingData movingNow;
 
 		public DrawPmdModel(string Path) {
 			pmdLoader = new PmdLoader(Path);
 			parentDir = System.IO.Path.GetDirectoryName(Environment.CurrentDirectory + "\\" + Path) + "\\";
 			flameCount = 0;
+			movingNow = new MovingData();
 		}
 
 		protected override void Draw() {
@@ -38,14 +43,23 @@ namespace ModelViewer {
 		}
 
 		private void UpdateCamera() {
-			var world = Matrix.RotationY(flameCount / 20 * (float)Math.PI / 180);
+			var world = Matrix.Identity;
 
-			var view = Matrix.LookAtRH(
-				new Vector3(0, 10, -10), new Vector3(0, 10, 0), new Vector3(0, 1, 0)
+			float div = 10;
+			var viewEye = new Vector3(0 , 10, -45);
+			var viewTarget = new Vector3(0, 10, 0);
+			var view = Matrix.Multiply(
+				Matrix.Multiply(
+					Matrix.RotationX(-movingNow.rotY / 100.0f), 
+					Matrix.RotationY(movingNow.rotX / 100.0f)
+				), Matrix.Multiply(
+					Matrix.LookAtRH(viewEye, viewTarget, new Vector3(0, 1, 0)),
+					Matrix.Translation(movingNow.posX / div, -movingNow.posY / div, movingNow.posZ * 0.5f)
+				)
 			);
 
 			var projection = Matrix.PerspectiveFovRH(
-				(float)Math.PI / 2, ClientSize.Width / ClientSize.Height, 0.1f, 1000
+				30 * (float)Math.PI / 180, ClientSize.Width / ClientSize.Height, 0.1f, 1000
 			);
 
 			effect.GetVariableByName("World").AsMatrix().SetMatrix(world);
@@ -94,16 +108,7 @@ namespace ModelViewer {
 		private void InitializeVertexLayout() {
 			vertexLayout = new Dx11.InputLayout(
 				device, effect.GetTechniqueByIndex(0).GetPassByIndex(0).Description.Signature,
-				new[] {
-					new Dx11.InputElement() {
-						SemanticName = "SV_Position", Format = Dxgi.Format.R32G32B32_Float,
-					},
-					new Dx11.InputElement() {
-						SemanticName = "TEXCOORD", Format = Dxgi.Format.R32G32_Float,
-						AlignedByteOffset = Dx11.InputElement.AppendAligned
-					}
-				}
-			);
+				VertexData.Elements);
 		}
 
 		private void InitializeVertexBuffer() {
@@ -168,10 +173,67 @@ namespace ModelViewer {
 			vertexBuffer.Dispose();
 			indexBuffer.Dispose();
 		}
+
+		protected override void MouseInput(object sender, Rwin.MouseInputEventArgs e) {
+			switch(e.ButtonFlags) {
+				case Rwin.MouseButtonFlags.MiddleDown:
+					isMiddleMoving = true;
+					break;
+				case Rwin.MouseButtonFlags.MiddleUp:
+					isMiddleMoving = false;
+					break;
+				case Rwin.MouseButtonFlags.RightDown:
+					isRightMoving = true;
+					break;
+				case Rwin.MouseButtonFlags.RightUp:
+					isRightMoving = false;
+					break;
+			}
+
+			if(isMiddleMoving) {
+				movingNow.posX += e.X;
+				movingNow.posY += e.Y;
+			}
+			if(e.WheelDelta > 0) {
+				movingNow.posZ++;
+			} else if(e.WheelDelta < 0) {
+				movingNow.posZ--;
+			}
+			if(isRightMoving) {
+				movingNow.rotX += e.X;
+				movingNow.rotY += e.Y;
+			}
+		}
+
+		protected override void KeyInput(object sender, Rwin.KeyboardInputEventArgs e) {
+		}
 	}
 
 	struct VertexData {
 		public Vector3 Position;
 		public Vector2 Uv;
+
+		public static readonly Dx11.InputElement[] Elements =
+			new[] {
+				new Dx11.InputElement() {
+					SemanticName = "SV_Position", Format = Dxgi.Format.R32G32B32_Float,
+			},
+				new Dx11.InputElement() {
+					SemanticName = "TEXCOORD", Format = Dxgi.Format.R32G32_Float,
+					AlignedByteOffset = Dx11.InputElement.AppendAligned
+			}
+		};
+	}
+
+	struct MovingData {
+		public int posX;
+		public int posY;
+		public int posZ;
+		public int rotX;
+		public int rotY;
+		public void ResetPosXY() { posX = posY = 0; }
+		public void ResetPosZ() { posZ = 0; }
+		public void ResetRotXY() { rotX = rotY = 0; }
+		public void ResetAll() { ResetPosXY(); ResetPosZ(); ResetRotXY(); }
 	}
 }

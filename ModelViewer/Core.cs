@@ -1,8 +1,10 @@
 ﻿using SlimDX;
+using SlimDX.Multimedia;
 using SlimDX.Windows;
 using System.Windows.Forms;
 using Dx11 = SlimDX.Direct3D11;
 using Dxgi = SlimDX.DXGI;
+using Rwin = SlimDX.RawInput;
 
 namespace ModelViewer {
 	class Core : Form {
@@ -13,6 +15,8 @@ namespace ModelViewer {
 
 		protected virtual void LoadContent() { }
 		protected virtual void UnloadContent() { }
+		protected virtual void MouseInput(object sender, Rwin.MouseInputEventArgs e) { }
+		protected virtual void KeyInput(object sender, Rwin.KeyboardInputEventArgs e) { }
 
 		public void Run() {
 			this.Height = this.Width = 500;
@@ -45,9 +49,10 @@ namespace ModelViewer {
 
 			InitializeRenderTarget();
 			InitializeDepthStencil();
-			device.ImmediateContext.OutputMerger.SetTargets(depthStencil, renderTarget);
 			InitializeViewport();
+			InitializeBlend();
 			LoadContent();
+			InitializeInputDevice();
 		}
 
 		private void InitializeRenderTarget() {
@@ -67,6 +72,7 @@ namespace ModelViewer {
 				})) {
 				depthStencil = new Dx11.DepthStencilView(device, depthBuffer);
 			}
+			device.ImmediateContext.OutputMerger.SetTargets(depthStencil, renderTarget);
 		}
 
 		private void InitializeViewport() {
@@ -75,8 +81,37 @@ namespace ModelViewer {
 			);
 		}
 
+		private void InitializeBlend() {
+			var blend = new Dx11.BlendStateDescription() {
+				AlphaToCoverageEnable = false, IndependentBlendEnable = false
+			};
+			for(int i = 0;i < 8; i++) {
+				blend.RenderTargets[i] = new Dx11.RenderTargetBlendDescription();
+				blend.RenderTargets[i].BlendEnable = true;
+				blend.RenderTargets[i].BlendOperation = Dx11.BlendOperation.Add;
+				blend.RenderTargets[i].BlendOperationAlpha = Dx11.BlendOperation.Add;
+				blend.RenderTargets[i].DestinationBlend = Dx11.BlendOption.InverseSourceAlpha;
+				blend.RenderTargets[i].DestinationBlendAlpha = Dx11.BlendOption.Zero;
+				blend.RenderTargets[i].RenderTargetWriteMask = Dx11.ColorWriteMaskFlags.All;
+				blend.RenderTargets[i].SourceBlend = Dx11.BlendOption.SourceAlpha;
+				blend.RenderTargets[i].SourceBlendAlpha = Dx11.BlendOption.One;
+			}
+			device.ImmediateContext.OutputMerger.BlendFactor = new Color4(1, 1, 1, 1);
+			device.ImmediateContext.OutputMerger.BlendSampleMask = 0xffffff;
+			device.ImmediateContext.OutputMerger.BlendState = Dx11.BlendState.FromDescription(device, blend);
+		}
+
+		private void InitializeInputDevice() {
+			Rwin.Device.RegisterDevice(UsagePage.Generic, UsageId.Mouse, Rwin.DeviceFlags.None);
+			Rwin.Device.MouseInput += MouseInput;
+			Rwin.Device.RegisterDevice(UsagePage.Generic, UsageId.Keyboard, Rwin.DeviceFlags.None);
+			Rwin.Device.KeyboardInput += KeyInput;
+		}
+
 		private void DisposeDevice() {
 			UnloadContent();
+			device.ImmediateContext.OutputMerger.BlendState.Dispose();
+			depthStencil.Dispose();
 			renderTarget.Dispose();
 			device.Dispose();
 			swapChain.Dispose();
