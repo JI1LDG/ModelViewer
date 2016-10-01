@@ -12,14 +12,11 @@ namespace ModelViewer {
 	class DrawPmdModel : Core {
 		Dx11.Effect effect;
 		Dx11.InputLayout vertexLayout;
-		Dx11.Buffer vertexBuffer;
-		Dx11.Buffer indexBuffer;
-		Dx11.ShaderResourceView[] texture;
+		Dx11.Buffer vertexBuffer, indexBuffer;
+		Dx11.ShaderResourceView[] texture, toons, sphs, spas;
 		PmdLoader pmdLoader;
 		int flameCount;
 		string parentDir;
-		bool isMiddleMoving;
-		bool isRightMoving;
 		MovingData movingNow;
 
 		public DrawPmdModel(string Path) {
@@ -34,7 +31,7 @@ namespace ModelViewer {
 			device.ImmediateContext.ClearDepthStencilView(depthStencil, Dx11.DepthStencilClearFlags.Depth, 1, 0);
 
 			UpdateCamera();
-			InitializeInputAsselbler();
+			InitializeInputAssembler();
 			DrawModel();
 
 			swapChain.Present(0, Dxgi.PresentFlags.None);
@@ -65,9 +62,12 @@ namespace ModelViewer {
 			effect.GetVariableByName("World").AsMatrix().SetMatrix(world);
 			effect.GetVariableByName("View").AsMatrix().SetMatrix(view);
 			effect.GetVariableByName("Projection").AsMatrix().SetMatrix(projection);
+			effect.GetVariableByName("lightDir").AsVector().Set(new Vector3(0, 0, 0.5f));
+			effect.GetVariableByName("ambientLight").AsVector().Set(new Vector3(1, 1, 1));
+			effect.GetVariableByName("eyePos").AsVector().Set(new Vector3(view.M41, view.M42, view.M43));
 		}
 
-		private void InitializeInputAsselbler() {
+		private void InitializeInputAssembler() {
 			device.ImmediateContext.InputAssembler.InputLayout = vertexLayout;
 			device.ImmediateContext.InputAssembler.SetVertexBuffers(
 				0, new Dx11.VertexBufferBinding(vertexBuffer, System.Runtime.InteropServices.Marshal.SizeOf(typeof(VertexData)), 0));
@@ -84,8 +84,37 @@ namespace ModelViewer {
 					effect.GetVariableByName("tex").AsScalar().Set(true);
 					effect.GetVariableByName("normalTexture").AsResource().SetResource(texture[i]);
 				}
+
+				if(sphs[i] == null) {
+					effect.GetVariableByName("sph").AsScalar().Set(false);
+				} else {
+					effect.GetVariableByName("sph").AsScalar().Set(true);
+					effect.GetVariableByName("sphTexture").AsResource().SetResource(sphs[i]);
+				}
+
+				if(spas[i] == null) {
+					effect.GetVariableByName("spa").AsScalar().Set(false);
+				} else {
+					effect.GetVariableByName("spa").AsScalar().Set(true);
+					effect.GetVariableByName("spaTexture").AsResource().SetResource(spas[i]);
+				}
+
+				byte toonIdx = pmdLoader.Material[i].ToonIndex;
+				if(toonIdx == 0xff || toons[toonIdx] == null) {
+					effect.GetVariableByName("ton").AsScalar().Set(false);
+				} else {
+					effect.GetVariableByName("ton").AsScalar().Set(true);
+					effect.GetVariableByName("toonTexture").AsResource().SetResource(toons[toonIdx]);
+				}
+
+				effect.GetVariableByName("matDiffuse").AsVector().Set(new Color4(pmdLoader.Material[i].Diffuse));
+				effect.GetVariableByName("matAmbient").AsVector().Set(new Color4(pmdLoader.Material[i].Mirror));
+				effect.GetVariableByName("matSpecular").AsVector().Set(new Color4(pmdLoader.Material[i].Specular));
+				effect.GetVariableByName("matAlpha").AsScalar().Set(pmdLoader.Material[i].Alpha);
+				effect.GetVariableByName("matSpecularity").AsScalar().Set(pmdLoader.Material[i].Specularity);
 				effect.GetTechniqueByIndex(0).GetPassByIndex(0).Apply(device.ImmediateContext);
 				device.ImmediateContext.DrawIndexed(pmdLoader.Material[i].IndiciesCount, startIdx, 0);
+
 				startIdx += pmdLoader.Material[i].IndiciesCount;
 			}
 		}
@@ -114,7 +143,7 @@ namespace ModelViewer {
 		private void InitializeVertexBuffer() {
 			using(var vertexStream = new DataStream(
 				pmdLoader.Vertex.Select(x => new VertexData() {
-					Position = x.Position, Uv = x.Uv
+					Position = x.Position, Normal = x.Normal, Uv = x.Uv
 				}).ToArray(), true, true)) {
 				vertexBuffer = new Dx11.Buffer(device, vertexStream,
 					new Dx11.BufferDescription() {
@@ -140,18 +169,41 @@ namespace ModelViewer {
 			texture = new Dx11.ShaderResourceView[pmdLoader.Material.Length];
 			for(int i = 0;i < texture.Length; i++) {
 				try {
-					texture[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].TextureFileName, 
-						new Dx11.ImageLoadInformation() {
-							Format = Dxgi.Format.R32G32B32A32_Float,
-							FilterFlags = Dx11.FilterFlags.Triangle,
-							MipFilterFlags = Dx11.FilterFlags.Triangle,
-							Usage = Dx11.ResourceUsage.Default,
-							BindFlags = Dx11.BindFlags.ShaderResource,
-							MipLevels = -1
-						}
-					);
+					texture[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].TextureFileName);
 				} catch(Dx11.Direct3D11Exception e) {
-					Console.WriteLine("Texture of Material" + i + " not found");
+					Console.WriteLine(e.Message + " " + pmdLoader.Material[i].TextureFileName);
+					continue;
+				}
+			}
+
+			sphs = new Dx11.ShaderResourceView[pmdLoader.Material.Length];
+			spas = new Dx11.ShaderResourceView[pmdLoader.Material.Length];
+			for(int i = 0;i < sphs.Length; i++) {
+				try {
+					if(pmdLoader.Material[i].SphereFileName == null) continue;
+					if(pmdLoader.Material[i].SphereFileName.Contains(".spa")) {
+						spas[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].SphereFileName);
+					} else if(pmdLoader.Material[i].SphereFileName.Contains(".sph")) {
+						sphs[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].SphereFileName);
+					}
+				} catch(Dx11.Direct3D11Exception e) {
+					Console.WriteLine(e.Message + " (" + pmdLoader.Material[i].SphereFileName + ")");
+					continue;
+				}
+			}
+
+			toons = new Dx11.ShaderResourceView[pmdLoader.Toon.Length];
+			for(int i = 0;i < toons.Length; i++) {
+				try {
+					toons[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Toon[i].FileName);
+				} catch(Dx11.Direct3D11Exception e) {
+					Console.WriteLine(e.Message + " " + pmdLoader.Toon[i].FileName);
+					try {
+						toons[i] = Dx11.ShaderResourceView.FromFile(device, @"toon\" + pmdLoader.Toon[i].FileName);
+						Console.WriteLine("Loaded from ToonFolder");
+					} catch {
+						Console.WriteLine("Failed Loading");
+					}
 					continue;
 				}
 			}
@@ -168,6 +220,9 @@ namespace ModelViewer {
 		protected override void UnloadContent() {
 			device.ImmediateContext.Rasterizer.State.Dispose();
 			foreach(var t in texture) t?.Dispose();
+			foreach(var t in toons) t?.Dispose();
+			foreach(var t in sphs) t?.Dispose();
+			foreach(var t in spas) t?.Dispose();
 			effect.Dispose();
 			vertexLayout.Dispose();
 			vertexBuffer.Dispose();
@@ -177,20 +232,20 @@ namespace ModelViewer {
 		protected override void MouseInput(object sender, Rwin.MouseInputEventArgs e) {
 			switch(e.ButtonFlags) {
 				case Rwin.MouseButtonFlags.MiddleDown:
-					isMiddleMoving = true;
+					movingNow.isMiddleMoving = true;
 					break;
 				case Rwin.MouseButtonFlags.MiddleUp:
-					isMiddleMoving = false;
+					movingNow.isMiddleMoving = false;
 					break;
 				case Rwin.MouseButtonFlags.RightDown:
-					isRightMoving = true;
+					movingNow.isRightMoving = true;
 					break;
 				case Rwin.MouseButtonFlags.RightUp:
-					isRightMoving = false;
+					movingNow.isRightMoving = false;
 					break;
 			}
 
-			if(isMiddleMoving) {
+			if(movingNow.isMiddleMoving) {
 				movingNow.posX += e.X;
 				movingNow.posY += e.Y;
 			}
@@ -199,7 +254,7 @@ namespace ModelViewer {
 			} else if(e.WheelDelta < 0) {
 				movingNow.posZ--;
 			}
-			if(isRightMoving) {
+			if(movingNow.isRightMoving) {
 				movingNow.rotX += e.X;
 				movingNow.rotY += e.Y;
 			}
@@ -211,13 +266,18 @@ namespace ModelViewer {
 
 	struct VertexData {
 		public Vector3 Position;
+		public Vector3 Normal;
 		public Vector2 Uv;
 
 		public static readonly Dx11.InputElement[] Elements =
 			new[] {
 				new Dx11.InputElement() {
 					SemanticName = "SV_Position", Format = Dxgi.Format.R32G32B32_Float,
-			},
+				},
+				new Dx11.InputElement() {
+					SemanticName = "NORMAL", Format = Dxgi.Format.R32G32B32_Float,
+					AlignedByteOffset = Dx11.InputElement.AppendAligned
+				},
 				new Dx11.InputElement() {
 					SemanticName = "TEXCOORD", Format = Dxgi.Format.R32G32_Float,
 					AlignedByteOffset = Dx11.InputElement.AppendAligned
@@ -231,6 +291,8 @@ namespace ModelViewer {
 		public int posZ;
 		public int rotX;
 		public int rotY;
+		public bool isMiddleMoving;
+		public bool isRightMoving;
 		public void ResetPosXY() { posX = posY = 0; }
 		public void ResetPosZ() { posZ = 0; }
 		public void ResetRotXY() { rotX = rotY = 0; }
