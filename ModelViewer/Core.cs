@@ -19,7 +19,7 @@ namespace ModelViewer {
 		protected virtual void KeyInput(object sender, Rwin.KeyboardInputEventArgs e) { }
 
 		public void Run() {
-			this.Height = this.Width = 500;
+			this.Height = this.Width = 800;
 			InitializeDevice();
 			MessagePump.Run(this, Draw);
 			DisposeDevice();
@@ -32,8 +32,8 @@ namespace ModelViewer {
 		}
 
 		private void InitializeDevice() {
-			Dx11.Device.CreateWithSwapChain(
-				Dx11.DriverType.Hardware, Dx11.DeviceCreationFlags.None,
+			device = new Dx11.Device(Dx11.DriverType.Hardware, Dx11.DeviceCreationFlags.None, Dx11.FeatureLevel.Level_11_0, Dx11.FeatureLevel.Level_10_1, Dx11.FeatureLevel.Level_10_0);
+			swapChain = new Dxgi.SwapChain(new Dxgi.Factory(), device,
 				new Dxgi.SwapChainDescription() {
 					BufferCount = 1, OutputHandle = this.Handle,
 					IsWindowed = true,
@@ -42,10 +42,9 @@ namespace ModelViewer {
 					}, ModeDescription = new Dxgi.ModeDescription() {
 						Width = ClientSize.Width, Height = ClientSize.Height,
 						RefreshRate = new Rational(60, 1),
-						Format = Dxgi.Format.R8G8B8A8_UNorm
+						Format = Dxgi.Format.R8G8B8A8_UNorm,
 					}, Usage = Dxgi.Usage.RenderTargetOutput
-				}, out device, out swapChain
-			);
+				});
 
 			InitializeRenderTarget();
 			InitializeDepthStencil();
@@ -68,7 +67,7 @@ namespace ModelViewer {
 					ArraySize = 1, BindFlags = Dx11.BindFlags.DepthStencil,
 					Format = Dxgi.Format.D32_Float,
 					Width = ClientSize.Width, Height = ClientSize.Height,
-					MipLevels = 1, SampleDescription = new Dxgi.SampleDescription(1, 0)
+					MipLevels = 1, SampleDescription = new Dxgi.SampleDescription(1, 0),
 				})) {
 				depthStencil = new Dx11.DepthStencilView(device, depthBuffer);
 			}

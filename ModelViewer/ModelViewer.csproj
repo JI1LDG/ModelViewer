@@ -57,7 +57,7 @@
     <Compile Include="Core.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="DrawPmdModel.cs">
+    <Compile Include="DrawMmdModel.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Program.cs" />

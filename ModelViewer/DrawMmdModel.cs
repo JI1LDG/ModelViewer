@@ -1,4 +1,4 @@
-﻿using MmdFileLoader.Pmd;
+﻿using MmdFileLoader;
 using SlimDX;
 using SlimDX.D3DCompiler;
 using System;
@@ -9,18 +9,18 @@ using Dxgi = SlimDX.DXGI;
 using Rwin = SlimDX.RawInput;
 
 namespace ModelViewer {
-	class DrawPmdModel : Core {
+	class DrawMmdModel : Core {
 		Dx11.Effect effect;
 		Dx11.InputLayout vertexLayout;
 		Dx11.Buffer vertexBuffer, indexBuffer;
 		Dx11.ShaderResourceView[] texture, toons, sphs, spas;
-		PmdLoader pmdLoader;
+		MmdLoader mmdLoader;
 		int flameCount;
 		string parentDir;
 		MovingData movingNow;
 
-		public DrawPmdModel(string Path) {
-			pmdLoader = new PmdLoader(Path);
+		public DrawMmdModel(string Path) {
+			mmdLoader = new MmdLoader(Path);
 			parentDir = System.IO.Path.GetDirectoryName(Environment.CurrentDirectory + "\\" + Path) + "\\";
 			flameCount = 0;
 			movingNow = new MovingData();
@@ -71,13 +71,13 @@ namespace ModelViewer {
 			device.ImmediateContext.InputAssembler.InputLayout = vertexLayout;
 			device.ImmediateContext.InputAssembler.SetVertexBuffers(
 				0, new Dx11.VertexBufferBinding(vertexBuffer, System.Runtime.InteropServices.Marshal.SizeOf(typeof(VertexData)), 0));
-			device.ImmediateContext.InputAssembler.SetIndexBuffer(indexBuffer, Dxgi.Format.R16_UInt, 0);
+			device.ImmediateContext.InputAssembler.SetIndexBuffer(indexBuffer, Dxgi.Format.R32_UInt, 0);
 			device.ImmediateContext.InputAssembler.PrimitiveTopology = Dx11.PrimitiveTopology.TriangleList;
 		}
 
 		private void DrawModel() {
 			int startIdx = 0;
-			for(int i = 0;i < pmdLoader.Material.Length;i++) {
+			for(int i = 0;i < mmdLoader.Material.Length;i++) {
 				if(texture[i] == null) {
 					effect.GetVariableByName("tex").AsScalar().Set(false);
 				} else {
@@ -99,23 +99,22 @@ namespace ModelViewer {
 					effect.GetVariableByName("spaTexture").AsResource().SetResource(spas[i]);
 				}
 
-				byte toonIdx = pmdLoader.Material[i].ToonIndex;
-				if(toonIdx == 0xff || toons[toonIdx] == null) {
+				if(toons[i] == null) {
 					effect.GetVariableByName("ton").AsScalar().Set(false);
 				} else {
 					effect.GetVariableByName("ton").AsScalar().Set(true);
-					effect.GetVariableByName("toonTexture").AsResource().SetResource(toons[toonIdx]);
+					effect.GetVariableByName("toonTexture").AsResource().SetResource(toons[i]);
 				}
 
-				effect.GetVariableByName("matDiffuse").AsVector().Set(new Color4(pmdLoader.Material[i].Diffuse));
-				effect.GetVariableByName("matAmbient").AsVector().Set(new Color4(pmdLoader.Material[i].Mirror));
-				effect.GetVariableByName("matSpecular").AsVector().Set(new Color4(pmdLoader.Material[i].Specular));
-				effect.GetVariableByName("matAlpha").AsScalar().Set(pmdLoader.Material[i].Alpha);
-				effect.GetVariableByName("matSpecularity").AsScalar().Set(pmdLoader.Material[i].Specularity);
+				effect.GetVariableByName("matDiffuse").AsVector().Set(new Color4(mmdLoader.Material[i].Diffuse));
+				effect.GetVariableByName("matAmbient").AsVector().Set(new Color4(mmdLoader.Material[i].Ambient));
+				effect.GetVariableByName("matSpecular").AsVector().Set(new Color4(mmdLoader.Material[i].Specular));
+				effect.GetVariableByName("matAlpha").AsScalar().Set(mmdLoader.Material[i].Alpha);
+				effect.GetVariableByName("matSpecularity").AsScalar().Set(mmdLoader.Material[i].Specularity);
 				effect.GetTechniqueByIndex(0).GetPassByIndex(0).Apply(device.ImmediateContext);
-				device.ImmediateContext.DrawIndexed(pmdLoader.Material[i].IndiciesCount, startIdx, 0);
+				device.ImmediateContext.DrawIndexed(mmdLoader.Material[i].IndiciesCount, startIdx, 0);
 
-				startIdx += pmdLoader.Material[i].IndiciesCount;
+				startIdx += mmdLoader.Material[i].IndiciesCount;
 			}
 		}
 
@@ -142,7 +141,7 @@ namespace ModelViewer {
 
 		private void InitializeVertexBuffer() {
 			using(var vertexStream = new DataStream(
-				pmdLoader.Vertex.Select(x => new VertexData() {
+				mmdLoader.Vertex.Select(x => new VertexData() {
 					Position = x.Position, Normal = x.Normal, Uv = x.Uv
 				}).ToArray(), true, true)) {
 				vertexBuffer = new Dx11.Buffer(device, vertexStream,
@@ -156,54 +155,55 @@ namespace ModelViewer {
 		}
 
 		private void InitializeIndexBuffer() {
-			using(var indexStream = new DataStream(pmdLoader.Index.SelectMany(x => x.Indicies).ToArray(), true, true)) {
+			using(var indexStream = new DataStream(mmdLoader.Index, true, true)) {
 				indexBuffer = new Dx11.Buffer(device, indexStream, new Dx11.BufferDescription() {
 					SizeInBytes = (int)indexStream.Length,
 					BindFlags = Dx11.BindFlags.IndexBuffer,
-					StructureByteStride = sizeof(short)
+					StructureByteStride = sizeof(int)
 				});
 			}
 		}
 
 		private void InitializeTexture() {
-			texture = new Dx11.ShaderResourceView[pmdLoader.Material.Length];
+			texture = new Dx11.ShaderResourceView[mmdLoader.Material.Length];
 			for(int i = 0;i < texture.Length; i++) {
 				try {
-					texture[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].TextureFileName);
-				} catch(Dx11.Direct3D11Exception e) {
-					Console.WriteLine(e.Message + " " + pmdLoader.Material[i].TextureFileName);
+					if(mmdLoader.Material[i].NormalTexture != null) {
+						texture[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + mmdLoader.Material[i].NormalTexture);
+					}
+				} catch(Exception e) {
+					Console.WriteLine(e.Message + " Normal: " + mmdLoader.Material[i].NormalTexture);
 					continue;
 				}
 			}
 
-			sphs = new Dx11.ShaderResourceView[pmdLoader.Material.Length];
-			spas = new Dx11.ShaderResourceView[pmdLoader.Material.Length];
+			sphs = new Dx11.ShaderResourceView[mmdLoader.Material.Length];
+			spas = new Dx11.ShaderResourceView[mmdLoader.Material.Length];
 			for(int i = 0;i < sphs.Length; i++) {
 				try {
-					if(pmdLoader.Material[i].SphereFileName == null) continue;
-					if(pmdLoader.Material[i].SphereFileName.Contains(".spa")) {
-						spas[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].SphereFileName);
-					} else if(pmdLoader.Material[i].SphereFileName.Contains(".sph")) {
-						sphs[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Material[i].SphereFileName);
+					if(mmdLoader.Material[i].AddSphereTexture != null) {
+						spas[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + mmdLoader.Material[i].AddSphereTexture);
+					} else if(mmdLoader.Material[i].MultiplySphereTexture != null) {
+						sphs[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + mmdLoader.Material[i].MultiplySphereTexture);
 					}
-				} catch(Dx11.Direct3D11Exception e) {
-					Console.WriteLine(e.Message + " (" + pmdLoader.Material[i].SphereFileName + ")");
+				} catch(Exception e) {
+					Console.WriteLine(e.Message + " Sphere #" + i);
 					continue;
 				}
 			}
 
-			toons = new Dx11.ShaderResourceView[pmdLoader.Toon.Length];
+			toons = new Dx11.ShaderResourceView[mmdLoader.Material.Length];
 			for(int i = 0;i < toons.Length; i++) {
 				try {
-					toons[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + pmdLoader.Toon[i].FileName);
-				} catch(Dx11.Direct3D11Exception e) {
-					Console.WriteLine(e.Message + " " + pmdLoader.Toon[i].FileName);
-					try {
-						toons[i] = Dx11.ShaderResourceView.FromFile(device, @"toon\" + pmdLoader.Toon[i].FileName);
-						Console.WriteLine("Loaded from ToonFolder");
-					} catch {
-						Console.WriteLine("Failed Loading");
+					if(mmdLoader.Material[i].ToonTexture != null) {
+						if(mmdLoader.Material[i].ToonTexture.Contains(@"toon\")) {
+							toons[i] = Dx11.ShaderResourceView.FromFile(device, mmdLoader.Material[i].ToonTexture);
+						} else {
+							toons[i] = Dx11.ShaderResourceView.FromFile(device, parentDir + mmdLoader.Material[i].ToonTexture);
+						}
 					}
+				} catch(Dx11.Direct3D11Exception e) {
+					Console.WriteLine(e.Message + " Toon: " + mmdLoader.Material[i].ToonTexture);
 					continue;
 				}
 			}
@@ -213,6 +213,8 @@ namespace ModelViewer {
 			device.ImmediateContext.Rasterizer.State = Dx11.RasterizerState.FromDescription(device,
 				new Dx11.RasterizerStateDescription() {
 					CullMode = Dx11.CullMode.None, FillMode = Dx11.FillMode.Solid,
+					IsDepthClipEnabled = false, IsMultisampleEnabled = false,
+					DepthBiasClamp = 0, SlopeScaledDepthBias = 0
 				}
 			);
 		}
