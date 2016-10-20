@@ -31,13 +31,14 @@ namespace ModelViewer {
 		}
 
 		protected override void LoadContent() {
+			InitializeRasterizerState();
 			InitializeEffect();
 			InitializeVertexLayout();
 			InitializeVertexBuffer();
 		}
 
 		private void InitializeEffect() {
-			using(var shaderByteCode = ShaderBytecode.CompileFromFile("effect.fx", "fx_5_0", ShaderFlags.None, EffectFlags.None)) {
+			using(var shaderByteCode = ShaderBytecode.CompileFromFile("edge.fx", "fx_5_0", ShaderFlags.None, EffectFlags.None)) {
 				effect = new Dx11.Effect(device, shaderByteCode);
 			}
 		}
@@ -49,6 +50,16 @@ namespace ModelViewer {
 					new Dx11.InputElement() {
 						SemanticName = "SV_Position", Format = Dxgi.Format.R32G32B32_Float
 					}
+				}
+			);
+		}
+
+		private void InitializeRasterizerState() {
+			device.ImmediateContext.Rasterizer.State = Dx11.RasterizerState.FromDescription(device,
+				new Dx11.RasterizerStateDescription() {
+					CullMode = Dx11.CullMode.None, FillMode = Dx11.FillMode.Solid,
+					IsDepthClipEnabled = false, IsMultisampleEnabled = false,
+					DepthBiasClamp = 0, SlopeScaledDepthBias = 0
 				}
 			);
 		}
