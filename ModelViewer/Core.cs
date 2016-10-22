@@ -102,6 +102,7 @@ namespace ModelViewer {
 			UnloadContent();
 			factor?.Dispose();
 			device.ImmediateContext.OutputMerger.BlendState?.Dispose();
+			device.ImmediateContext?.Dispose();
 			depthStencil?.Dispose();
 			renderTarget?.Dispose();
 			device?.Dispose();

@@ -44,7 +44,7 @@ namespace ModelViewer {
 				30 * (float)Math.PI / 180, ClientSize.Width / ClientSize.Height, 0.1f, 1000
 			);
 
-			LightDir = -newEye;
+			LightDir = new Vector4(-0.5f, -1, 0.5f, 1);
 			EyePosition = newEye;
 		}
 	}

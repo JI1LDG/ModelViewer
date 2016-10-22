@@ -16,17 +16,21 @@ namespace ModelViewer {
 		MovingData movingNow;
 		Camera camera;
 		VmdLoader vmdLoader;
+		MotionManager motMng;
 		BoneManager boneMng;
 
 		public DrawMmdModel(string Path) {
 			mmdLoader = new MmdLoader(Path);
-			vmdLoader = new VmdLoader(@"motion\leftKneeUp.vmd");
+			vmdLoader = new VmdLoader(@"motion\kl.vmd");
 			flameCount = 0;
 			movingNow = new MovingData();
 			camera = new Camera();
 			camera.ViewTarget = new Vector3(0, 10, 0);
 			camera.ViewEye = new Vector3(0, 10, -45);
+			motMng = new MotionManager(mmdLoader.Bone);
 			boneMng = new BoneManager(mmdLoader.Bone);
+			motMng.SetMotion(vmdLoader.Motion, true);
+			motMng.Start();
 		}
 
 		protected override void Draw() {
@@ -34,8 +38,7 @@ namespace ModelViewer {
 			device.ImmediateContext.ClearDepthStencilView(depthStencil, Dx11.DepthStencilClearFlags.Depth, 1, 0);
 
 			UpdateCamera();
-			//boneMng.SetPose(new VmdMotion[0]);
-			boneMng.SetPose(vmdLoader.Motion);
+			boneMng.SetPose(motMng.GetMotion());
 			boneMng.Update();
 			effect.SetBoneMatrix(boneMng.Results);
 			effect.DrawAll(camera);

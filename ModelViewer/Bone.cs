@@ -7,9 +7,14 @@ using System.Linq;
 namespace ModelViewer {
 	public class BoneManager {
 		public List<SkinBone> Bones { get; private set; }
-		public Matrix[] Results { get; private set; }
 		public List<SkinBone> Roots { get; private set; }
 		public int MaxRank { get; private set; }
+
+		public Matrix[] Results {
+			get {
+				return Bones.Select(x => x.Offset * x.Bone).ToArray();
+			}
+		}
 
 		public BoneManager(MmdBone[] bones) {
 			Bones = new List<SkinBone>();
@@ -21,6 +26,7 @@ namespace ModelViewer {
 			}
 
 			for(int i = 0;i < bones.Length; i++) {
+				if(bones[i].ParentIndex >= 0) Bones[i].Parent = Bones[bones[i].ParentIndex];
 				for(int j = i + 1;j < bones.Length; j++) {
 					if(i == bones[j].ParentIndex) {
 						Bones[i].Children.Add(Bones[j]);
@@ -29,40 +35,57 @@ namespace ModelViewer {
 			}
 
 			foreach(var r in Roots) {
-				SkinBone.CalcRelative(Bones[r.Id], Matrix.Identity);
+				SkinBone.CalcRelative(r, Matrix.Identity);
 			}
 		}
 
-		public void SetPose(VmdMotion[] motion) {
-			foreach(var x in Bones) { 
-				x.Bone = Matrix.Identity;
-				x.Transpose = Matrix.Identity;
+		public void SetPose(ApplyedMotion[] motion) {
+			foreach(var b in Bones) {
+				b.MotionTranslate = Vector3.Zero;
+				b.MotionRotate = Quaternion.Identity;
 			}
-			foreach(var m in motion) {
-				var target = Bones.FirstOrDefault(x => x.Name == m.BoneName);
-				if(target != null) {
-					target.SetTranspose(m.Rotation, m.Position);
-				}
+
+			for(int i = 0;i < motion.Length; i++) {
+				Bones[i].MotionRotate = motion[i].Rotate;
+				Bones[i].MotionTranslate = motion[i].Translate;
 			}
+		}
+
+		public Matrix CalcTranspose(Quaternion Rotation, Vector3 Translation) {
+			return Matrix.RotationQuaternion(Rotation) * Matrix.Translation(Translation);
 		}
 
 		public void Update() {
-			Results = Enumerable.Range(0, Bones.Count).Select(x => Matrix.Identity).ToArray();
 			foreach(var b in Bones) {
-				b.Bone = b.Init;
-				b.Bone = b.Transpose * b.Bone;
+				b.Translate = Vector3.Zero;
+				b.Rotate = Quaternion.Identity;
 			}
 
-			foreach(var r in Roots) {
-				CalcBone(Bones[r.Id], Matrix.Identity, 0);
+			UpdateAtPhysicBA(true);
+
+			//Physic
+
+			//UpdateAtPhysicBA(false);
+		}
+
+		private void UpdateAtPhysicBA(bool isBefore) {
+			for(int i = 0; i < MaxRank + 1; i++) {
+				foreach(var b in Bones) {
+					if(b.IsBeforePhysic == isBefore && b.Rank == i) {
+						b.Rotate *= b.MotionRotate;
+						b.Translate += b.MotionTranslate;
+					}
+				}
+				UpdateBone();
+
+				//IK
 			}
 		}
 
-		private void CalcBone(SkinBone me, Matrix parent, int rank) {
-			me.Bone *= parent;
-			Results[me.Id] = me.Offset * me.Bone;
-			foreach(var c in me.Children) {
-				CalcBone(c, me.Bone, rank);
+		private void UpdateBone() {
+			foreach(var b in Bones) {
+				b.Bone = CalcTranspose(b.Rotate, b.Translate) * b.Init;
+				if(b.Parent != null) b.Bone *= b.Parent.Bone;
 			}
 		}
 	}
@@ -70,14 +93,20 @@ namespace ModelViewer {
 	public class SkinBone {
 		public int Id { get; private set; }
 		public string Name { get; private set; }
+		public SkinBone Parent { get; set; }
 		public List<SkinBone> Children { get; set; }
 		public int Rank { get; private set; }
 		public bool IsBeforePhysic { get; private set; }
 
 		public Matrix Init { get; private set; }
 		public Matrix Offset { get; private set; }
-		public Matrix Transpose { get; set; }
 		public Matrix Bone { get; set; }
+
+		public Quaternion Rotate { get; set; }
+		public Vector3 Translate { get; set; }
+
+		public Quaternion MotionRotate { get; set; }
+		public Vector3 MotionTranslate { get; set; }
 
 		public SkinBone(MmdBone[] bones, int index) {
 			Id = index;
@@ -86,7 +115,6 @@ namespace ModelViewer {
 			Rank = bones[index].Rank;
 			IsBeforePhysic = !bones[index].BoneFlag.HasFlag(BoneFlagEnum.TransformAfterPhysic);
 
-			Transpose = Matrix.Identity;
 			CreateMatrix(bones, index);
 		}
 
@@ -107,19 +135,16 @@ namespace ModelViewer {
 			}
 
 			Vector3 org = new Vector3(0, 1, 0);
-			Init = Matrix.RotationAxis(Vector3.Cross(org, sub), (float)Math.Acos(Vector3.Dot(org, sub))) * Matrix.Translation(pos);
+			//Init = Matrix.RotationAxis(Vector3.Cross(org, sub), (float)Math.Acos(Vector3.Dot(org, sub))) * Matrix.Translation(pos);
+			Init = Matrix.Translation(pos); //解せぬ
 			Offset = Matrix.Invert(Init);
 		}
 
-		public void SetTranspose(Quaternion Rotation, Vector3 Translation) {
-			Transpose = Matrix.RotationQuaternion(Rotation) * Matrix.Translation(Translation);
-		}
-
-		public static void CalcRelative(SkinBone me, Matrix parentOffset) {
+		public static void CalcRelative(SkinBone me, Matrix parent) {
 			foreach(var c in me.Children) {
 				CalcRelative(c, me.Offset);
 			}
-			me.Init *= parentOffset;
+			me.Init *= parent;
 		}
 	}
 }

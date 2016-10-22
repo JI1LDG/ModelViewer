@@ -105,7 +105,7 @@ namespace ModelViewer {
 		private void SetMaterial(int nowCount) {
 			texture.SetTexture(nowCount);
 			SetLight(nowCount);
-			if(materials[nowCount].DrawFlag.HasFlag(DrawFlagEnumes.DrawBoth) || materials[nowCount].Alpha == 0.99f) {
+			if(materials[nowCount].DrawFlag.HasFlag(DrawFlagEnumes.DrawBoth) || materials[nowCount].Alpha == 0.999f) {
 				SetCull(false);
 			} else {
 				SetCull(true);
@@ -154,6 +154,9 @@ namespace ModelViewer {
 		}
 
 		public void Dispose() {
+			SetCull(true);
+			device.ImmediateContext.Rasterizer.State?.Dispose();
+			SetCull(false);
 			device.ImmediateContext.Rasterizer.State?.Dispose();
 			texture?.Dispose();
 			index?.Dispose();
