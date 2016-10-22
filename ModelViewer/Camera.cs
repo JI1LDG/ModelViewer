@@ -16,7 +16,7 @@ namespace ModelViewer {
 		private readonly float divZ = 0.5f;
 
 		public Camera() {
-			AmbientLight = new Vector3(0.58f);
+			AmbientLight = new Vector3(1);
 		}
 
 		public void Update(MovingData movingNow, Size ClientSize) {
@@ -44,7 +44,7 @@ namespace ModelViewer {
 				30 * (float)Math.PI / 180, ClientSize.Width / ClientSize.Height, 0.1f, 1000
 			);
 
-			LightDir = new Vector4(-0.5f, -1, 0.5f, 1);
+			LightDir = new Vector4(0, 20, 0, 1);
 			EyePosition = newEye;
 		}
 	}

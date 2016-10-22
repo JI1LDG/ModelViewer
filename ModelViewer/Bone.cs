@@ -120,21 +120,7 @@ namespace ModelViewer {
 
 		private void CreateMatrix(MmdBone[] bones, int index) {
 			Vector3 pos = bones[index].Position;
-			Vector3 tail;
-			if(bones[index].TailIndex >= 0) {
-				tail = bones[bones[index].TailIndex].Position;
-			} else {
-				tail = pos + bones[index].TailOffset;
-			}
 
-			Vector3 sub = Vector3.Normalize(tail - pos);
-			if(sub.Length() == 0) {
-				Init = Matrix.Translation(pos);
-				Offset = Matrix.Translation(-pos);
-				return;
-			}
-
-			Vector3 org = new Vector3(0, 1, 0);
 			//Init = Matrix.RotationAxis(Vector3.Cross(org, sub), (float)Math.Acos(Vector3.Dot(org, sub))) * Matrix.Translation(pos);
 			Init = Matrix.Translation(pos); //解せぬ
 			Offset = Matrix.Invert(Init);

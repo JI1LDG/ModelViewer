@@ -83,7 +83,7 @@ namespace ModelViewer {
 				blend.RenderTargets[i].SourceBlendAlpha = Dx11.BlendOption.One;
 			}
 			
-			device.ImmediateContext.OutputMerger.BlendFactor = new Color4(1, 1, 1, 1);
+			device.ImmediateContext.OutputMerger.BlendFactor = new Color4(0, 0, 0, 0);
 			device.ImmediateContext.OutputMerger.BlendSampleMask = 0xffffff;
 			device.ImmediateContext.OutputMerger.BlendState = Dx11.BlendState.FromDescription(device, blend);
 		}
@@ -105,11 +105,7 @@ namespace ModelViewer {
 		private void SetMaterial(int nowCount) {
 			texture.SetTexture(nowCount);
 			SetLight(nowCount);
-			if(materials[nowCount].DrawFlag.HasFlag(DrawFlagEnumes.DrawBoth) || materials[nowCount].Alpha == 0.999f) {
-				SetCull(false);
-			} else {
-				SetCull(true);
-			}
+			SetCull(!(materials[nowCount].DrawFlag.HasFlag(DrawFlagEnumes.DrawBoth) || materials[nowCount].Alpha == 0.999f));
 		}
 
 		private void SetLight(int nowCount) {
